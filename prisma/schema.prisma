@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum GameStatus {
+  WAITING
+  BIDDING
+  PLAYING
+  FINISHED
+}
+
+enum Seat {
+  NORTH
+  EAST
+  SOUTH
+  WEST
+}
+
+model User {
+  id        String       @id @default(cuid())
+  email     String       @unique
+  password  String
+  username  String       @unique
+  isBot     Boolean      @default(false)
+  createdAt DateTime     @default(now())
+  games     GamePlayer[]
+}
+
+model Game {
+  id            String       @id @default(cuid())
+  status        GameStatus   @default(WAITING)
+  dealer        Seat         @default(NORTH)
+  vulnerability String       @default("NONE")
+  currentSeat   Seat?
+  contract      String?
+  declarer      Seat?
+  dummy         Seat?
+  dummyRevealed Boolean      @default(false)
+  nsScore       Int          @default(0)
+  ewScore       Int          @default(0)
+  createdAt     DateTime     @default(now())
+  players       GamePlayer[]
+  bids          Bid[]
+  plays         CardPlay[]
+}
+
+model GamePlayer {
+  id     String  @id @default(cuid())
+  userId String
+  gameId String
+  seat   Seat
+  hand   String  @default("[]")
+  isBot  Boolean @default(false)
+  user   User    @relation(fields: [userId], references: [id])
+  game   Game    @relation(fields: [gameId], references: [id])
+
+  @@unique([gameId, seat])
+  @@unique([gameId, userId])
+}
+
+model Bid {
+  id     String @id @default(cuid())
+  gameId String
+  seat   Seat
+  call   String
+  order  Int
+  game   Game   @relation(fields: [gameId], references: [id])
+}
+
+model CardPlay {
+  id       String @id @default(cuid())
+  gameId   String
+  seat     Seat
+  card     String
+  trickNum Int
+  order    Int
+  game     Game   @relation(fields: [gameId], references: [id])
+}
