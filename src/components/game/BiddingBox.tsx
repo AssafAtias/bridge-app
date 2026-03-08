@@ -1,6 +1,7 @@
 "use client";
 
 import { Seat } from "./GameClient";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface Props {
   bids: Array<{ seat: Seat; call: string; order: number }>;
@@ -16,9 +17,7 @@ interface Props {
 const DENOMINATIONS = ["C", "D", "H", "S", "NT"] as const;
 const LEVELS = [1, 2, 3, 4, 5, 6, 7] as const;
 
-const DENOM_ORDER: Record<string, number> = {
-  C: 0, D: 1, H: 2, S: 3, NT: 4,
-};
+const DENOM_ORDER: Record<string, number> = { C: 0, D: 1, H: 2, S: 3, NT: 4 };
 
 const DENOM_SYMBOLS: Record<string, { symbol: string; color: string }> = {
   C: { symbol: "♣", color: "text-gray-200" },
@@ -28,18 +27,14 @@ const DENOM_SYMBOLS: Record<string, { symbol: string; color: string }> = {
   NT: { symbol: "NT", color: "text-yellow-300" },
 };
 
-function parseLastBid(lastBid: string | null): { level: number; denomOrder: number } | null {
+function parseLastBid(lastBid: string | null) {
   if (!lastBid) return null;
   const level = parseInt(lastBid[0]);
   const denom = lastBid.slice(1);
   return { level, denomOrder: DENOM_ORDER[denom] ?? 0 };
 }
 
-function isBidAvailable(
-  level: number,
-  denom: string,
-  lastBid: string | null
-): boolean {
+function isBidAvailable(level: number, denom: string, lastBid: string | null): boolean {
   const last = parseLastBid(lastBid);
   if (!last) return true;
   if (level > last.level) return true;
@@ -47,26 +42,20 @@ function isBidAvailable(
   return false;
 }
 
-export default function BiddingBox({
-  currentSeat,
-  isMyTurn,
-  lastBid,
-  doubled,
-  redoubled,
-  onBid,
-}: Props) {
+export default function BiddingBox({ currentSeat, isMyTurn, lastBid, doubled, redoubled, onBid }: Props) {
+  const { t } = useLanguage();
+
   return (
     <div className="bg-green-800 border border-green-600 rounded-xl p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-yellow-400 font-semibold text-sm">Bidding Box</h3>
+        <h3 className="text-yellow-400 font-semibold text-sm">{t.biddingBox}</h3>
         {currentSeat && (
           <span className="text-xs text-green-400">
-            {isMyTurn ? "Your turn" : `${currentSeat}'s turn`}
+            {isMyTurn ? t.yourTurnBid : t.turnOf(currentSeat)}
           </span>
         )}
       </div>
 
-      {/* Bid grid */}
       <div className="mb-3">
         {LEVELS.map((level) => (
           <div key={level} className="grid grid-cols-5 gap-1 mb-1">
@@ -96,44 +85,37 @@ export default function BiddingBox({
         ))}
       </div>
 
-      {/* Special calls */}
       <div className="grid grid-cols-3 gap-2">
         <button
           onClick={() => isMyTurn && onBid("PASS")}
           disabled={!isMyTurn}
-          className={`
-            py-2 rounded-lg text-sm font-bold border transition
-            ${isMyTurn
+          className={`py-2 rounded-lg text-sm font-bold border transition ${
+            isMyTurn
               ? "bg-green-600 border-green-400 hover:bg-green-500 text-white cursor-pointer"
               : "bg-green-900 border-green-700 text-green-600 cursor-not-allowed opacity-50"
-            }
-          `}
+          }`}
         >
           PASS
         </button>
         <button
           onClick={() => isMyTurn && !doubled && onBid("X")}
           disabled={!isMyTurn || doubled}
-          className={`
-            py-2 rounded-lg text-sm font-bold border transition
-            ${isMyTurn && !doubled
+          className={`py-2 rounded-lg text-sm font-bold border transition ${
+            isMyTurn && !doubled
               ? "bg-red-800 border-red-600 hover:bg-red-700 text-red-200 cursor-pointer"
               : "bg-green-900 border-green-700 text-green-600 cursor-not-allowed opacity-50"
-            }
-          `}
+          }`}
         >
           X
         </button>
         <button
           onClick={() => isMyTurn && doubled && !redoubled && onBid("XX")}
           disabled={!isMyTurn || !doubled || redoubled}
-          className={`
-            py-2 rounded-lg text-sm font-bold border transition
-            ${isMyTurn && doubled && !redoubled
+          className={`py-2 rounded-lg text-sm font-bold border transition ${
+            isMyTurn && doubled && !redoubled
               ? "bg-blue-800 border-blue-600 hover:bg-blue-700 text-blue-200 cursor-pointer"
               : "bg-green-900 border-green-700 text-green-600 cursor-not-allowed opacity-50"
-            }
-          `}
+          }`}
         >
           XX
         </button>

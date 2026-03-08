@@ -6,6 +6,7 @@ import { getPusherClient } from "@/lib/pusher";
 import BridgeTable from "./BridgeTable";
 import BiddingBox from "./BiddingBox";
 import ScoreSheet from "./ScoreSheet";
+import { useLanguage } from "@/context/LanguageContext";
 
 export type Seat = "NORTH" | "EAST" | "SOUTH" | "WEST";
 export type GameStatus = "WAITING" | "BIDDING" | "PLAYING" | "FINISHED";
@@ -63,8 +64,23 @@ interface Props {
 
 export default function GameClient({ gameId, userId, username, initialGame }: Props) {
   const router = useRouter();
+  const { t, lang, toggleLang } = useLanguage();
   const [game, setGame] = useState<GameState>(initialGame);
   const [actionError, setActionError] = useState("");
+  const [zoom, setZoom] = useState(() => {
+    if (typeof window !== "undefined") {
+      return parseFloat(localStorage.getItem("bridge-zoom") ?? "1") || 1;
+    }
+    return 1;
+  });
+
+  function adjustZoom(delta: number) {
+    setZoom((prev) => {
+      const next = Math.max(0.6, Math.min(1.6, Math.round((prev + delta) * 10) / 10));
+      localStorage.setItem("bridge-zoom", String(next));
+      return next;
+    });
+  }
 
   const myPlayer = game.players.find((p) => p.userId === userId);
   const mySeat = myPlayer?.seat ?? null;
@@ -357,33 +373,91 @@ export default function GameClient({ gameId, userId, username, initialGame }: Pr
 
   return (
     <div className="min-h-screen bg-green-900 flex flex-col">
-      {/* Top bar */}
-      <div className="bg-green-950 border-b border-green-700 px-4 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <span className="text-yellow-400 font-bold">♠ Bridge</span>
+      {/* ── Top menu bar ─────────────────────────────────────────────────── */}
+      <div className="bg-green-950 border-b border-green-700 px-4 py-2 flex items-center justify-between gap-4">
+        {/* Left: logo + contract */}
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="text-yellow-400 font-bold shrink-0">♠ {t.appName}</span>
           {game.contract && (
-            <span className="text-white text-sm">
-              Contract: <strong className="text-yellow-300">{game.contract}</strong>
-              {game.declarer && (
-                <span className="text-green-400"> by {game.declarer}</span>
-              )}
+            <span className="text-white text-sm truncate">
+              {t.contract}: <strong className="text-yellow-300">{game.contract}</strong>
+              {game.declarer && <span className="text-green-400"> {t.by} {game.declarer}</span>}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-4 text-sm">
-          <span className="text-green-400">
-            NS: <strong className="text-white">{game.nsScore}</strong>
+
+        {/* Right: controls */}
+        <div className="flex items-center gap-2 shrink-0 text-sm">
+          {/* Scores */}
+          <span className="text-green-400 hidden sm:inline">
+            {t.ns}: <strong className="text-white">{game.nsScore}</strong>
           </span>
-          <span className="text-green-400">
-            EW: <strong className="text-white">{game.ewScore}</strong>
+          <span className="text-green-400 hidden sm:inline">
+            {t.ew}: <strong className="text-white">{game.ewScore}</strong>
           </span>
-          <span className="text-green-500">
-            {game.status === "WAITING"
-              ? `Waiting (${game.players.length}/4)`
-              : game.status === "BIDDING"
-              ? `Bidding — ${game.currentSeat}'s turn`
-              : `Playing — ${game.currentSeat}'s turn`}
-          </span>
+
+          {/* Divider */}
+          <span className="text-green-700 hidden sm:inline">|</span>
+
+          {/* Logged-in user */}
+          <span className="text-green-300 font-medium">👤 {username}</span>
+
+          {/* Divider */}
+          <span className="text-green-700">|</span>
+
+          {/* Zoom out */}
+          <button
+            onClick={() => adjustZoom(-0.1)}
+            disabled={zoom <= 0.6}
+            title={t.zoomOut}
+            className="bg-green-800 hover:bg-green-700 disabled:opacity-40 text-white font-bold px-2 py-1 rounded text-sm transition"
+          >
+            {t.zoomOut}
+          </button>
+
+          {/* Zoom level */}
+          <span className="text-green-400 text-xs w-8 text-center">{Math.round(zoom * 100)}%</span>
+
+          {/* Zoom in */}
+          <button
+            onClick={() => adjustZoom(0.1)}
+            disabled={zoom >= 1.6}
+            title={t.zoomIn}
+            className="bg-green-800 hover:bg-green-700 disabled:opacity-40 text-white font-bold px-2 py-1 rounded text-sm transition"
+          >
+            {t.zoomIn}
+          </button>
+
+          {/* Divider */}
+          <span className="text-green-700">|</span>
+
+          {/* Language toggle */}
+          <button
+            onClick={toggleLang}
+            title="Toggle language / החלף שפה"
+            className="bg-green-800 hover:bg-green-700 text-green-200 font-bold px-2 py-1 rounded text-sm transition"
+          >
+            {lang === "en" ? "עב" : "EN"}
+          </button>
+
+          {/* Divider */}
+          <span className="text-green-700">|</span>
+
+          {/* New game */}
+          <button
+            onClick={() => router.push("/lobby")}
+            className="bg-blue-700 hover:bg-blue-600 text-white font-bold px-3 py-1 rounded text-sm transition"
+          >
+            {t.newGame}
+          </button>
+
+          {/* Exit */}
+          <button
+            onClick={() => router.push("/lobby")}
+            className="bg-green-700 hover:bg-green-600 text-green-200 font-bold px-3 py-1 rounded text-sm transition"
+          >
+            {t.exitGame}
+          </button>
         </div>
       </div>
 
@@ -395,29 +469,26 @@ export default function GameClient({ gameId, userId, username, initialGame }: Pr
             mySeat={mySeat}
             dummySeat={dummySeat}
             isMyTurn={isMyTurn}
+            zoom={zoom}
             onPlayCard={playCard}
           />
         </div>
 
         {/* Side panel */}
         <div className="lg:w-96 space-y-4">
-          {/* Status */}
           {game.status === "WAITING" && (
             <div className="bg-green-800 border border-green-600 rounded-xl p-4">
-              <h3 className="text-yellow-400 font-semibold mb-2">Waiting for players</h3>
-              <p className="text-green-400 text-sm mb-4">
-                {game.players.length}/4 players have joined.
-              </p>
+              <h3 className="text-yellow-400 font-semibold mb-2">{t.waitingForPlayers}</h3>
+              <p className="text-green-400 text-sm mb-4">{t.playersJoined(game.players.length)}</p>
               <button
                 onClick={fillWithBots}
                 className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg px-4 py-2 transition text-sm"
               >
-                🤖 Fill empty seats with AI
+                {t.fillWithAI}
               </button>
             </div>
           )}
 
-          {/* Bidding box */}
           {game.status === "BIDDING" && (
             <BiddingBox
               bids={game.bids}
@@ -435,25 +506,24 @@ export default function GameClient({ gameId, userId, username, initialGame }: Pr
             />
           )}
 
-          {/* Turn indicator */}
           {game.status === "PLAYING" && (
             <div className={`rounded-xl p-3 border text-center ${
-              isMyTurn
-                ? "bg-yellow-600 border-yellow-400 animate-pulse"
-                : "bg-green-800 border-green-600"
+              isMyTurn ? "bg-yellow-600 border-yellow-400 animate-pulse" : "bg-green-800 border-green-600"
             }`}>
               {isMyTurn
-                ? <p className="text-white font-bold">🎯 Your turn! Double-click a card to play</p>
-                : <p className="text-green-300 text-sm font-medium">⏳ Waiting for <strong className="text-white">{game.currentSeat}</strong></p>
+                ? <p className="text-white font-bold">{t.yourTurnPlay}</p>
+                : <p className="text-green-300 text-sm font-medium">{t.waitingFor(game.currentSeat ?? "")}</p>
               }
             </div>
           )}
 
-          {/* Trick history */}
           {game.status === "PLAYING" && game.trickResults.length > 0 && (
             <div className="bg-green-800 border border-green-600 rounded-xl p-4">
               <h3 className="text-yellow-400 font-semibold mb-3 text-base">
-                Tricks ({game.trickResults.filter(t => isNSSeat(t.winner)).length} NS / {game.trickResults.filter(t => !isNSSeat(t.winner)).length} EW)
+                {t.tricks(
+                  game.trickResults.filter(tr => isNSSeat(tr.winner)).length,
+                  game.trickResults.filter(tr => !isNSSeat(tr.winner)).length
+                )}
               </h3>
               <div className="overflow-y-auto max-h-48 space-y-1">
                 {[...game.trickResults].sort((a, b) => b.trickNum - a.trickNum).map((tr) => {
@@ -484,10 +554,9 @@ export default function GameClient({ gameId, userId, username, initialGame }: Pr
             </div>
           )}
 
-          {/* Bid history */}
           {game.bids.length > 0 && (
             <div className="bg-green-800 border border-green-600 rounded-xl p-4">
-              <h3 className="text-yellow-400 font-semibold mb-3 text-base">Bid History</h3>
+              <h3 className="text-yellow-400 font-semibold mb-3 text-base">{t.bidHistory}</h3>
               <BidHistory bids={game.bids} dealer={game.dealer} />
             </div>
           )}

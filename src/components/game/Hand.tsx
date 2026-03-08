@@ -1,10 +1,13 @@
 "use client";
 
+import { useLanguage } from "@/context/LanguageContext";
+
 interface Props {
   cards: string[];
   playable: boolean;
   ledSuit: string | null;
   hand: string[];
+  zoom?: number;
   onPlayCard?: (card: string) => void;
 }
 
@@ -35,17 +38,22 @@ function isCardPlayable(card: string, hand: string[], ledSuit: string | null): b
   return !hand.some((c) => c.slice(-1) === ledSuit);
 }
 
-const CARD_W = 44;
-const CARD_H = 64;
-const STEP = 28;
+const BASE_W = 44;
+const BASE_H = 64;
+const BASE_STEP = 28;
 
-export default function Hand({ cards, playable, ledSuit, hand, onPlayCard }: Props) {
+export default function Hand({ cards, playable, ledSuit, hand, zoom = 1, onPlayCard }: Props) {
+  const { t } = useLanguage();
   const sorted = sortCards(cards);
-  const fanWidth = CARD_W + Math.max(0, sorted.length - 1) * STEP;
+
+  const cardW = Math.round(BASE_W * zoom);
+  const cardH = Math.round(BASE_H * zoom);
+  const step = Math.round(BASE_STEP * zoom);
+  const fanWidth = cardW + Math.max(0, sorted.length - 1) * step;
 
   return (
     <div className="flex flex-col items-center gap-1">
-      <div className="relative" style={{ width: fanWidth, height: CARD_H }}>
+      <div className="relative" style={{ width: fanWidth, height: cardH }}>
         {sorted.map((card, idx) => {
           const suit = card.slice(-1);
           const rank = card.slice(0, -1);
@@ -59,13 +67,13 @@ export default function Hand({ cards, playable, ledSuit, hand, onPlayCard }: Pro
               key={card}
               onDoubleClick={() => canPlay && onPlayCard && onPlayCard(card)}
               disabled={!canPlay || !onPlayCard}
-              title={canPlay && onPlayCard ? `Double-click to play ${displayRank}${suitSymbol}` : undefined}
+              title={canPlay && onPlayCard ? `${t.doubleClickHint}: ${displayRank}${suitSymbol}` : undefined}
               style={{
                 position: "absolute",
-                left: idx * STEP,
+                left: idx * step,
                 top: 0,
-                width: CARD_W,
-                height: CARD_H,
+                width: cardW,
+                height: cardH,
                 zIndex: idx + 1,
               }}
               className={`
@@ -80,14 +88,14 @@ export default function Hand({ cards, playable, ledSuit, hand, onPlayCard }: Pro
               onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.zIndex = "50"; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.zIndex = String(idx + 1); }}
             >
-              <span className="text-sm font-bold leading-none">{displayRank}</span>
-              <span className="text-lg leading-none mt-0.5">{suitSymbol}</span>
+              <span className="font-bold leading-none" style={{ fontSize: Math.round(13 * zoom) }}>{displayRank}</span>
+              <span className="leading-none mt-0.5" style={{ fontSize: Math.round(16 * zoom) }}>{suitSymbol}</span>
             </button>
           );
         })}
       </div>
       {playable && onPlayCard && (
-        <p className="text-yellow-300 text-xs opacity-70">Double-click a card to play</p>
+        <p className="text-yellow-300 text-xs opacity-70">{t.doubleClickHint}</p>
       )}
     </div>
   );

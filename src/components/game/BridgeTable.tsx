@@ -3,18 +3,16 @@
 import { useState } from "react";
 import { GameState, Seat } from "./GameClient";
 import Hand from "./Hand";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface Props {
   game: GameState;
   mySeat: Seat | null;
   dummySeat: Seat | null;
   isMyTurn: boolean;
+  zoom: number;
   onPlayCard: (card: string) => void;
 }
-
-const SEAT_LABELS: Record<Seat, string> = {
-  NORTH: "North", EAST: "East", SOUTH: "South", WEST: "West",
-};
 
 const SUIT_SYMBOLS: Record<string, string> = { S: "♠", H: "♥", D: "♦", C: "♣" };
 
@@ -31,7 +29,8 @@ function cardDisplay(card: string) {
   return { rank: rank === "T" ? "10" : rank, sym, isRed };
 }
 
-export default function BridgeTable({ game, mySeat, dummySeat, isMyTurn, onPlayCard }: Props) {
+export default function BridgeTable({ game, mySeat, dummySeat, isMyTurn, zoom, onPlayCard }: Props) {
+  const { t } = useLanguage();
   const [animCard, setAnimCard] = useState<string | null>(null);
 
   function handlePlay(card: string) {
@@ -47,15 +46,12 @@ export default function BridgeTable({ game, mySeat, dummySeat, isMyTurn, onPlayC
   const ledSuit = currentTrickPlays.length > 0 ? currentTrickPlays[0].card.slice(-1) : null;
 
   const trickCardBySeat: Partial<Record<Seat, string>> = {};
-  for (const p of currentTrickPlays) {
-    trickCardBySeat[p.seat as Seat] = p.card;
-  }
+  for (const p of currentTrickPlays) trickCardBySeat[p.seat as Seat] = p.card;
 
-  // Last bid per seat
   const lastBidPerSeat: Partial<Record<Seat, string>> = {};
   for (const bid of game.bids) lastBidPerSeat[bid.seat as Seat] = bid.call;
 
-  const renderSeat = (seat: Seat, position: "top" | "bottom" | "left" | "right") => {
+  const renderSeat = (seat: Seat) => {
     const player = getPlayer(seat);
     const isCurrentTurn = game.currentSeat === seat;
     const isMe = seat === mySeat;
@@ -67,52 +63,44 @@ export default function BridgeTable({ game, mySeat, dummySeat, isMyTurn, onPlayC
       (isCurrentTurn || (isCurrentTurn && seat === dummySeat && mySeat === game.declarer));
     const hcp = canSeeHand && player?.hand && player.hand.length > 0 ? countHCP(player.hand) : null;
     const lastBid = lastBidPerSeat[seat];
-    const isRotated = position === "left" || position === "right";
 
     return (
-      <div className={`flex flex-col items-center gap-1 ${isRotated ? "rotate-90" : ""}`}>
-        {/* Player badge — pulsing ring when it's their turn */}
-        <div
-          className={`
-            px-3 py-1 rounded-full text-xs font-semibold border transition-colors
-            ${isCurrentTurn && game.status !== "WAITING"
-              ? "bg-yellow-400 text-green-900 border-yellow-300 seat-active"
-              : "bg-green-800 text-green-200 border-green-600"
-            }
-          `}
-        >
+      <div className="flex flex-col items-center gap-1">
+        <div className={`
+          px-3 py-1 rounded-full text-xs font-semibold border transition-colors whitespace-nowrap
+          ${isCurrentTurn && game.status !== "WAITING"
+            ? "bg-yellow-400 text-green-900 border-yellow-300 seat-active"
+            : "bg-green-800 text-green-200 border-green-600"
+          }
+        `}>
           {player?.username ?? "—"}{" "}
-          <span className="opacity-70">({SEAT_LABELS[seat]})</span>
+          <span className="opacity-70">({t.seats[seat]})</span>
           {isMe && <span className="ml-1 text-yellow-700">★</span>}
           {player?.isBot && <span className="ml-1">🤖</span>}
           {hcp !== null && <span className="ml-1.5 font-bold text-yellow-700">{hcp}pt</span>}
         </div>
 
-        {/* Last bid badge */}
         {lastBid && <BidBadge call={lastBid} />}
 
-        {/* Hand */}
         {canSeeHand && player?.hand && (
-          <div className={position === "top" ? "mt-1" : "mb-1"}>
-            <Hand
-              cards={player.hand}
-              playable={isPlayable}
-              ledSuit={ledSuit}
-              hand={player.hand}
-              onPlayCard={
-                isPlayable && (isMe || (seat === dummySeat && mySeat === game.declarer))
-                  ? handlePlay
-                  : undefined
-              }
-            />
-          </div>
+          <Hand
+            cards={player.hand}
+            playable={isPlayable}
+            ledSuit={ledSuit}
+            hand={player.hand}
+            zoom={zoom}
+            onPlayCard={
+              isPlayable && (isMe || (seat === dummySeat && mySeat === game.declarer))
+                ? handlePlay
+                : undefined
+            }
+          />
         )}
 
-        {/* Hidden hand placeholder */}
         {!canSeeHand && player && (
-          <div className="flex gap-0.5 mt-1">
+          <div className="flex flex-col gap-0.5 mt-1 items-center">
             {Array.from({ length: Math.max(0, 13 - game.plays.filter((p) => p.seat === seat).length) }).map((_, i) => (
-              <div key={i} className="w-5 h-8 bg-blue-800 border border-blue-600 rounded" />
+              <div key={i} className="w-8 h-2.5 bg-blue-800 border border-blue-600 rounded" />
             ))}
           </div>
         )}
@@ -121,96 +109,92 @@ export default function BridgeTable({ game, mySeat, dummySeat, isMyTurn, onPlayC
   };
 
   return (
-    <div className="relative w-full aspect-square max-w-5xl mx-auto">
-      {/* Green felt */}
-      <div className="absolute inset-0 bg-green-700 rounded-2xl border-4 border-green-900 shadow-2xl" />
+    <div className="w-full overflow-x-auto">
+      {/* CSS grid: 3 cols (W | felt | E) × 3 rows (N | felt | S)
+          North/South sit in the same 480px column as the felt → always centered */}
+      <div
+        className="grid mx-auto gap-3 items-center justify-items-center"
+        style={{ gridTemplateColumns: "auto 480px auto", gridTemplateRows: "auto 480px auto" }}
+      >
+        {/* Row 0: empty | North | empty */}
+        <div />
+        <div className="flex justify-center w-full">{renderSeat("NORTH")}</div>
+        <div />
 
-      {/* ── Compass trick display + contract info ─────────────────────── */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="pointer-events-auto grid grid-cols-3 grid-rows-3 gap-3 items-center justify-items-center"
-          style={{ width: 300, height: 300 }}>
+        {/* Row 1: West | Green felt | East */}
+        <div>{renderSeat("WEST")}</div>
 
-          {/* Row 0 */}
-          <div />
-          <div className="flex flex-col items-center gap-1">
-            {trickCardBySeat.NORTH
-              ? <CenterCard card={trickCardBySeat.NORTH} />
-              : <EmptySlot />}
-            <span className="text-green-400 text-xs font-medium">N</span>
+        {/* Green felt */}
+        <div className="relative w-full h-full bg-green-700 rounded-2xl border-4 border-green-900 shadow-2xl">
+
+          {/* Compass trick display */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div
+              className="pointer-events-auto grid grid-cols-3 grid-rows-3 gap-3 items-center justify-items-center"
+              style={{ width: 300, height: 300 }}
+            >
+              <div />
+              <div className="flex flex-col items-center gap-1">
+                {trickCardBySeat.NORTH ? <CenterCard card={trickCardBySeat.NORTH} /> : <EmptySlot />}
+                <span className="text-green-400 text-xs font-medium">N</span>
+              </div>
+              <div />
+
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-green-400 text-xs font-medium">W</span>
+                {trickCardBySeat.WEST ? <CenterCard card={trickCardBySeat.WEST} /> : <EmptySlot />}
+              </div>
+
+              <div className="rounded-xl px-3 py-2 text-center bg-green-800 bg-opacity-90 border border-green-600 shadow-lg">
+                {game.contract ? (
+                  <>
+                    <p className="text-yellow-400 font-bold text-lg leading-none">{game.contract}</p>
+                    {game.declarer && <p className="text-green-300 text-xs mt-0.5">{game.declarer}</p>}
+                  </>
+                ) : game.status === "BIDDING" ? (
+                  <p className="text-green-300 text-xs">Bidding…</p>
+                ) : (
+                  <p className="text-green-300 text-xs">{game.players.length}/4</p>
+                )}
+                {game.status === "PLAYING" && (
+                  <p className="text-green-400 text-xs mt-0.5">Trick {currentTrickNum + 1}/13</p>
+                )}
+              </div>
+
+              <div className="flex flex-col items-center gap-1">
+                {trickCardBySeat.EAST ? <CenterCard card={trickCardBySeat.EAST} /> : <EmptySlot />}
+                <span className="text-green-400 text-xs font-medium">E</span>
+              </div>
+
+              <div />
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-green-400 text-xs font-medium">S</span>
+                {trickCardBySeat.SOUTH ? <CenterCard card={trickCardBySeat.SOUTH} /> : <EmptySlot />}
+              </div>
+              <div />
+            </div>
           </div>
-          <div />
 
-          {/* Row 1 */}
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-green-400 text-xs font-medium">W</span>
-            {trickCardBySeat.WEST
-              ? <CenterCard card={trickCardBySeat.WEST} />
-              : <EmptySlot />}
-          </div>
-
-          {/* Center info box */}
-          <div className="rounded-xl px-3 py-2 text-center bg-green-800 bg-opacity-90 border border-green-600 shadow-lg">
-            {game.contract ? (
-              <>
-                <p className="text-yellow-400 font-bold text-lg leading-none">{game.contract}</p>
-                {game.declarer && <p className="text-green-300 text-xs mt-0.5">{game.declarer}</p>}
-              </>
-            ) : game.status === "BIDDING" ? (
-              <p className="text-green-300 text-xs">Bidding…</p>
-            ) : (
-              <p className="text-green-300 text-xs">{game.players.length}/4</p>
-            )}
-            {game.status === "PLAYING" && (
-              <p className="text-green-400 text-xs mt-0.5">Trick {currentTrickNum + 1}/13</p>
-            )}
-          </div>
-
-          <div className="flex flex-col items-center gap-1">
-            {trickCardBySeat.EAST
-              ? <CenterCard card={trickCardBySeat.EAST} />
-              : <EmptySlot />}
-            <span className="text-green-400 text-xs font-medium">E</span>
-          </div>
-
-          {/* Row 2 */}
-          <div />
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-green-400 text-xs font-medium">S</span>
-            {trickCardBySeat.SOUTH
-              ? <CenterCard card={trickCardBySeat.SOUTH} />
-              : <EmptySlot />}
-          </div>
-          <div />
+          {/* Play animation overlay */}
+          {animCard && (
+            <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none">
+              <div className="card-play-anim">
+                <BigCard card={animCard} />
+              </div>
+            </div>
+          )}
         </div>
-      </div>
 
-      {/* ── Play animation overlay ─────────────────────────────────────── */}
-      {animCard && (
-        <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none">
-          <div className="card-play-anim">
-            <BigCard card={animCard} />
-          </div>
-        </div>
-      )}
+        <div>{renderSeat("EAST")}</div>
 
-      {/* ── Seats ──────────────────────────────────────────────────────── */}
-      <div className="absolute top-4 left-0 right-0 flex justify-center">
-        {renderSeat("NORTH", "top")}
-      </div>
-      <div className="absolute bottom-4 left-0 right-0 flex justify-center">
-        {renderSeat("SOUTH", "bottom")}
-      </div>
-      <div className="absolute left-4 top-0 bottom-0 flex items-center">
-        {renderSeat("WEST", "left")}
-      </div>
-      <div className="absolute right-4 top-0 bottom-0 flex items-center">
-        {renderSeat("EAST", "right")}
+        {/* Row 2: empty | South | empty */}
+        <div />
+        <div className="flex justify-center w-full">{renderSeat("SOUTH")}</div>
+        <div />
       </div>
     </div>
   );
 }
-
-// ── Sub-components ────────────────────────────────────────────────────────────
 
 function CenterCard({ card }: { card: string }) {
   const { rank, sym, isRed } = cardDisplay(card);
