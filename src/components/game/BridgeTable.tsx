@@ -113,6 +113,7 @@ export default function BridgeTable({ game, mySeat, dummySeat, isMyTurn, zoom, o
       {/* CSS grid: 3 cols (W | felt | E) × 3 rows (N | felt | S)
           North/South sit in the same 480px column as the felt → always centered */}
       <div
+        dir="ltr"
         className="grid mx-auto gap-3 items-center justify-items-center"
         style={{ gridTemplateColumns: "auto 480px auto", gridTemplateRows: "auto 480px auto" }}
       >

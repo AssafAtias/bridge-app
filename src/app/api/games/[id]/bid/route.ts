@@ -127,8 +127,8 @@ export async function POST(
       });
     }
 
-    // Fire bot turns in background (don't await — respond to client immediately)
-    executeBotTurnsIfNeeded(gameId).catch(console.error);
+    // Await bot turns — Vercel serverless kills background tasks after response
+    await executeBotTurnsIfNeeded(gameId);
 
     return NextResponse.json({ success: true, call, nextSeat: newState.currentSeat });
   } catch (error) {
