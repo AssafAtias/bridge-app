@@ -339,6 +339,11 @@ export default function GameClient({ gameId, userId, username, initialGame }: Pr
     }
   }
 
+  async function abandonGame() {
+    await fetch(`/api/games/${gameId}/abandon`, { method: "POST" });
+    router.push("/lobby");
+  }
+
   async function fillWithBots() {
     setActionError("");
     const res = await fetch(`/api/games/${gameId}/add-bot`, { method: "POST" });
@@ -445,7 +450,7 @@ export default function GameClient({ gameId, userId, username, initialGame }: Pr
 
           {/* New game */}
           <button
-            onClick={() => router.push("/lobby")}
+            onClick={abandonGame}
             className="bg-blue-700 hover:bg-blue-600 text-white font-bold px-3 py-1 rounded text-sm transition"
           >
             {t.newGame}
@@ -453,7 +458,7 @@ export default function GameClient({ gameId, userId, username, initialGame }: Pr
 
           {/* Exit */}
           <button
-            onClick={() => router.push("/lobby")}
+            onClick={abandonGame}
             className="bg-green-700 hover:bg-green-600 text-green-200 font-bold px-3 py-1 rounded text-sm transition"
           >
             {t.exitGame}

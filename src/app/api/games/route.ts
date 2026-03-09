@@ -28,19 +28,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if user is already in a non-finished game
-    const existingGame = await db.gamePlayer.findFirst({
+    // Auto-abandon any non-finished games the user is still in
+    const existingGames = await db.gamePlayer.findMany({
       where: {
         userId: session.user.id,
         game: { status: { not: "FINISHED" } },
       },
+      select: { gameId: true },
     });
 
-    if (existingGame) {
-      return NextResponse.json(
-        { error: "You are already in a game" },
-        { status: 409 }
-      );
+    if (existingGames.length > 0) {
+      await db.game.updateMany({
+        where: { id: { in: existingGames.map((g) => g.gameId) } },
+        data: { status: "FINISHED" },
+      });
     }
 
     const game = await db.game.create({
