@@ -2,6 +2,7 @@ import type { NextAuthConfig } from "next-auth";
 
 // Lightweight config for Edge runtime (middleware) — no DB imports
 export const authConfig: NextAuthConfig = {
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
   providers: [],
   pages: {
     signIn: "/signin",
